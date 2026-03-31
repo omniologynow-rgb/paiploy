@@ -44,7 +44,7 @@
 - [x] Paiploy-branded loading states
 - [x] Custom scrollbar styling
 - [x] Favicon (P in emerald on dark background)
-- [x] package.json name updated to "paiploy-frontend"
+- [x] Revenue Recovery Calculator on landing page (interactive, 67% recovery rate math, slider input)
 - [x] Removed @supabase/supabase-js dependency
 
 ## Testing Status
