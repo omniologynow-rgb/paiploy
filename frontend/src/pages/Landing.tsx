@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CreditCard, TrendingUp, Mail, BarChart3, Check, X as XIcon, ArrowRight,
-  Zap, Shield, Clock, Bell, MessageSquare, FileText, ChevronRight
+  Zap, Shield, Clock, Bell, Calculator, ChevronRight
 } from 'lucide-react';
 
 const DashboardMockup = () => (
@@ -61,6 +61,85 @@ const features = [
   { icon: Clock, title: 'AI-Powered Retry Timing', description: 'Optimal retry windows based on decline codes and card type for maximum success.' },
   { icon: Bell, title: 'Pre-Dunning Alerts', description: 'Catch expiring cards before they fail with proactive customer notifications.' },
 ];
+
+const RevenueCalculator = () => {
+  const [revenue, setRevenue] = useState(50000);
+  const [failRate, setFailRate] = useState(5);
+  const RECOVERY_RATE = 0.67;
+
+  const monthlyLost = revenue * (failRate / 100);
+  const monthlyRecovered = monthlyLost * RECOVERY_RATE;
+
+  const fmt = (n: number) =>
+    n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+  return (
+    <div className="card p-8" data-testid="revenue-calculator">
+      <div className="grid md:grid-cols-2 gap-8">
+        <div className="space-y-6">
+          <div>
+            <label htmlFor="calc-revenue" className="block text-sm font-medium text-slate-300 mb-2">
+              Monthly Revenue
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+              <input
+                id="calc-revenue"
+                data-testid="calc-revenue-input"
+                type="number"
+                min="0"
+                step="1000"
+                value={revenue}
+                onChange={(e) => setRevenue(Math.max(0, Number(e.target.value)))}
+                className="input-field pl-8 text-lg font-semibold"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="calc-fail-rate" className="flex items-center justify-between text-sm font-medium text-slate-300 mb-2">
+              <span>Failed Payment Rate</span>
+              <span className="text-emerald-400 font-bold">{failRate}%</span>
+            </label>
+            <input
+              id="calc-fail-rate"
+              data-testid="calc-fail-rate-input"
+              type="range"
+              min="1"
+              max="20"
+              value={failRate}
+              onChange={(e) => setFailRate(Number(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-surface-tertiary
+                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
+                [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-emerald-500
+                [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(16,185,129,0.4)] [&::-webkit-slider-thumb]:cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-slate-500 mt-1">
+              <span>1%</span>
+              <span>Industry avg: 5%</span>
+              <span>20%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center text-center bg-surface-primary rounded-xl p-6 border border-[#1e293b]">
+          <p className="text-sm text-red-400 font-medium mb-1">You're losing</p>
+          <p className="text-2xl font-bold text-red-400 mb-4" data-testid="calc-losing-amount">{fmt(monthlyLost)}/mo</p>
+          <div className="w-12 h-px bg-[#1e293b] mb-4" />
+          <p className="text-sm text-emerald-400 font-medium mb-1">Paiploy recovers</p>
+          <p className="text-4xl font-extrabold text-emerald-400 mb-1" data-testid="calc-recovered-amount">~{fmt(monthlyRecovered)}</p>
+          <p className="text-xs text-slate-500 mb-6">per month (67% avg recovery rate)</p>
+          <Link
+            to="/register"
+            data-testid="calc-cta"
+            className="btn-primary px-6 py-2.5 text-sm inline-flex items-center gap-2"
+          >
+            Start Free <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const comparisonData = [
   { feature: 'Smart Retries', paiploy: true, churnBuster: true, churnKey: true, diy: false },
@@ -332,6 +411,20 @@ export const Landing: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Revenue Recovery Calculator */}
+      <section className="py-24 px-4" data-testid="calculator-section">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-5">
+              <Calculator className="h-7 w-7 text-emerald-400" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">How Much Are You Losing?</h2>
+            <p className="text-slate-400 max-w-lg mx-auto">Enter your numbers and see how much revenue Paiploy can recover for you.</p>
+          </div>
+          <RevenueCalculator />
         </div>
       </section>
 
