@@ -1,5 +1,21 @@
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+/**
+ * Extract a human-readable error message from FastAPI error responses.
+ * Handles both string detail and array-of-objects detail (validation errors).
+ */
+function extractErrorMessage(error: any): string {
+  const detail = error?.detail;
+  if (!detail) return error?.message || 'Request failed';
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    // FastAPI validation error: [{msg: "...", loc: [...], type: "..."}]
+    return detail.map((d: any) => d.msg || d.message || String(d)).join('. ');
+  }
+  if (typeof detail === 'object') return detail.msg || detail.message || JSON.stringify(detail);
+  return String(detail);
+}
+
 export class ApiClient {
   private token: string | null = null;
 
@@ -34,7 +50,7 @@ export class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
-      throw new Error(error.detail || 'Request failed');
+      throw new Error(extractErrorMessage(error));
     }
 
     return response.json();
@@ -146,6 +162,44 @@ export class ApiClient {
 
   async sendDunningEmail(paymentId: number) {
     return this.request(`/api/payments/failed/${paymentId}/send-email`, { method: 'POST' });
+  }
+
+  // ─── Billing ────────────────────────────────────────────────
+  async getBillingStatus() {
+    return this.request('/api/billing/status');
+  }
+
+  async createCheckout(priceId: string) {
+    return this.request('/api/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ price_id: priceId }),
+    });
+  }
+
+  async getBillingPortal() {
+    return this.request('/api/billing/portal', { method: 'POST' });
+  }
+
+  // ─── Auth: Forgot / Reset Password ─────────────────────────
+  async forgotPassword(email: string) {
+    return this.request('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password: newPassword }),
+    });
+  }
+
+  async verifyEmail(token: string) {
+    return this.request('/api/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
   }
 }
 
