@@ -1,14 +1,24 @@
+import stripe
+import requests
+import logging
 from celery import Task
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 import random
 from app.celery_app import celery_app
 from app.database import SessionLocal
+from app.config import get_settings
 from app.models import (
     FailedPayment, RetryAttempt, DunningEmail, UserSettings,
     PaymentStatus, RetryResult, RetryMethod, EmailTemplate,
     EmailStatus, FailureCode, RecoveryStats, StatsPeriod
 )
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+# Initialize Stripe
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 class DatabaseTask(Task):
@@ -27,23 +37,81 @@ class DatabaseTask(Task):
 
 
 def send_email(to_email: str, subject: str, html_body: str, template_vars: dict):
+    """Send email via Resend API."""
     body = html_body
     for key, value in template_vars.items():
         body = body.replace(f"{{{key}}}", str(value))
 
-    print(f"[EMAIL] To: {to_email}")
-    print(f"[EMAIL] Subject: {subject}")
-    print(f"[EMAIL] Body preview: {body[:100]}...")
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": f"{settings.FROM_NAME} <{settings.FROM_EMAIL}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": body,
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        result = response.json()
+        logger.info(f"Email sent to {to_email}: {result.get('id')}")
+        return result
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to send email to {to_email}: {e}")
+        raise
 
 
-def attempt_stripe_retry(invoice_id: str, access_token: str) -> dict:
-    jitter = random.uniform(0.8, 1.2)
+def attempt_stripe_retry(invoice_id: str, stripe_account_id: str) -> dict:
+    """Retry a failed Stripe invoice payment using the connected account."""
+    try:
+        invoice = stripe.Invoice.pay(
+            invoice_id,
+            stripe_account=stripe_account_id,
+        )
+        return {
+            "success": True,
+            "invoice_status": invoice.status,
+            "amount_paid": invoice.amount_paid,
+        }
+    except stripe.error.CardError as e:
+        error = e.error
+        return {
+            "success": False,
+            "error": error.code if error else "card_error",
+            "message": str(e),
+        }
+    except stripe.error.InvalidRequestError as e:
+        return {
+            "success": False,
+            "error": "invalid_request",
+            "message": str(e),
+        }
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error retrying invoice {invoice_id}: {e}")
+        return {
+            "success": False,
+            "error": "stripe_error",
+            "message": str(e),
+        }
 
-    return {
-        "success": False,
-        "error": "card_declined",
-        "message": "Mock retry - card declined"
-    }
+
+def get_billing_portal_url(customer_id: str, stripe_account_id: str, return_url: str = None) -> str:
+    """Generate a Stripe Billing Portal URL so the customer can update their payment method."""
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=return_url or settings.FRONTEND_URL,
+            stripe_account=stripe_account_id,
+        )
+        return session.url
+    except stripe.error.StripeError as e:
+        logger.error(f"Failed to create billing portal session for {customer_id}: {e}")
+        return f"{settings.FRONTEND_URL}/update-payment"
 
 
 @celery_app.task(base=DatabaseTask, bind=True)
@@ -84,7 +152,7 @@ def process_retry_queue(self):
         connected_account = failed_payment.connected_account
         result = attempt_stripe_retry(
             failed_payment.stripe_invoice_id,
-            connected_account.access_token
+            connected_account.stripe_account_id
         )
 
         retry.executed_at = now
@@ -106,7 +174,6 @@ def process_retry_queue(self):
                 failed_payment.status = PaymentStatus.EXHAUSTED
             else:
                 failed_payment.status = PaymentStatus.RETRYING
-
                 schedule_next_retry.delay(failed_payment.id)
 
         db.commit()
@@ -191,6 +258,8 @@ def send_dunning_email(self, failed_payment_id: int, template_name: str):
         UserSettings.user_id == user.id
     ).first()
 
+    connected_account = failed_payment.connected_account
+
     from app.routers.dunning import EMAIL_TEMPLATES
 
     template_enum = EmailTemplate(template_name)
@@ -199,31 +268,42 @@ def send_dunning_email(self, failed_payment_id: int, template_name: str):
     if not template:
         return
 
+    # Generate real Stripe billing portal URL for payment update
+    update_url = get_billing_portal_url(
+        failed_payment.stripe_customer_id,
+        connected_account.stripe_account_id if connected_account else None,
+    )
+
     template_vars = {
         "customer_name": failed_payment.customer_name or "Customer",
         "amount": f"${failed_payment.amount_cents / 100:.2f}",
         "currency": failed_payment.currency.upper(),
         "product_name": "Subscription",
         "company_name": user.company_name or "Our Company",
-        "update_payment_url": f"https://stripe.com/mock-update-payment/{failed_payment.stripe_customer_id}",
-        "support_email": user_settings.support_email if user_settings and user_settings.support_email else "support@recoverpay.com"
+        "update_payment_url": update_url,
+        "support_email": user_settings.support_email if user_settings and user_settings.support_email else "support@paiploy.com"
     }
 
     subject = template["subject"]
     for key, value in template_vars.items():
         subject = subject.replace(f"{{{key}}}", str(value))
 
-    send_email(
-        failed_payment.customer_email,
-        subject,
-        template["body_html"],
-        template_vars
-    )
+    try:
+        send_email(
+            failed_payment.customer_email,
+            subject,
+            template["body_html"],
+            template_vars
+        )
+        email_status = EmailStatus.SENT
+    except Exception as e:
+        logger.error(f"Failed to send dunning email for payment {failed_payment_id}: {e}")
+        email_status = EmailStatus.FAILED
 
     dunning_email = DunningEmail(
         failed_payment_id=failed_payment_id,
         template_name=template_enum,
-        status=EmailStatus.SENT
+        status=email_status
     )
 
     db.add(dunning_email)
