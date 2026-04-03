@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Save, Link as LinkIcon, Unlink, CreditCard, ArrowRight, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Save, Link as LinkIcon, Unlink, CreditCard, ArrowRight, Trash2, AlertTriangle, RefreshCw, Crown, Shield, Zap, ExternalLink, Check } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { apiClient } from '../api/client';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 interface UserSettings {
   id: number;
@@ -19,19 +21,75 @@ interface UserSettings {
   support_email: string | null;
 }
 
+const PRICE_PRO = 'price_1TH7GKRbzOJIbMjyDAI4zPXX';
+const PRICE_BUSINESS = 'price_1TH7GZRbzOJIbMjyg4cwSYnH';
+
+const plans = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: '$0',
+    period: '/mo',
+    icon: Zap,
+    color: 'slate',
+    features: ['Up to 50 recoveries/mo', 'Smart retries', 'Basic analytics', 'Email support'],
+    priceId: null,
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '$39',
+    period: '/mo',
+    icon: Crown,
+    color: 'emerald',
+    popular: true,
+    features: ['Unlimited recoveries', 'Custom dunning emails', 'Advanced analytics', 'Priority support', 'Custom retry schedules'],
+    priceId: PRICE_PRO,
+  },
+  {
+    id: 'business',
+    name: 'Business',
+    price: '$99',
+    period: '/mo',
+    icon: Shield,
+    color: 'amber',
+    features: ['Everything in Pro', 'Multiple Stripe accounts', 'Dedicated account manager', 'Custom integrations', 'SLA guarantee', 'Phone support'],
+    priceId: PRICE_BUSINESS,
+  },
+];
+
 export const Settings: React.FC = () => {
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [billingLoading, setBillingLoading] = useState<string | null>(null);
+  const [currentTier, setCurrentTier] = useState<string>('free');
 
   useEffect(() => {
     Promise.all([
       apiClient.getSettings().then(setSettings).catch(console.error),
       apiClient.getConnectionStatus().then(() => setIsConnected(true)).catch(() => setIsConnected(false)),
+      apiClient.getBillingStatus().then((s: any) => setCurrentTier(s.tier || 'free')).catch(() => setCurrentTier('free')),
     ]).finally(() => setLoading(false));
   }, []);
+
+  // Handle post-checkout query params
+  useEffect(() => {
+    const billingStatus = searchParams.get('billing');
+    if (billingStatus === 'success') {
+      showToast('Subscription activated! Welcome to your new plan 🎉', 'success');
+      setSearchParams({}, { replace: true });
+      // Refresh billing status
+      apiClient.getBillingStatus().then((s: any) => setCurrentTier(s.tier || 'free')).catch(() => {});
+    } else if (billingStatus === 'canceled') {
+      showToast('Checkout canceled. You can upgrade anytime.', 'info');
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const handleSave = async () => {
     if (!settings) return;
@@ -63,6 +121,30 @@ export const Settings: React.FC = () => {
       showToast('Stripe account disconnected', 'info');
     } catch (error: any) {
       showToast(error.message || 'Failed to disconnect', 'error');
+    }
+  };
+
+  const handleUpgrade = async (priceId: string, planName: string) => {
+    setBillingLoading(priceId);
+    try {
+      const { checkout_url } = await apiClient.createCheckout(priceId);
+      window.location.href = checkout_url;
+    } catch (error: any) {
+      showToast(error.message || `Failed to start ${planName} checkout`, 'error');
+    } finally {
+      setBillingLoading(null);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setBillingLoading('portal');
+    try {
+      const { portal_url } = await apiClient.getBillingPortal();
+      window.location.href = portal_url;
+    } catch (error: any) {
+      showToast(error.message || 'Failed to open billing portal', 'error');
+    } finally {
+      setBillingLoading(null);
     }
   };
 
@@ -118,6 +200,116 @@ export const Settings: React.FC = () => {
                 <LinkIcon className="h-4 w-4" /> Connect Stripe
               </button>
             )}
+          </div>
+        </div>
+
+        {/* ── Subscription & Billing ── */}
+        <div className="card p-6" data-testid="billing-section" id="billing">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-100 mb-1">Subscription & Billing</h2>
+              <p className="text-sm text-slate-400">Manage your plan and payment method</p>
+            </div>
+            {currentTier !== 'free' && (
+              <button
+                onClick={handleManageBilling}
+                disabled={billingLoading === 'portal'}
+                data-testid="manage-billing-btn"
+                className="text-sm text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <ExternalLink className="h-4 w-4" />
+                {billingLoading === 'portal' ? 'Opening...' : 'Manage Billing'}
+              </button>
+            )}
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            {plans.map((plan) => {
+              const isCurrentPlan = currentTier === plan.id;
+              const isDowngrade = (currentTier === 'business' && plan.id === 'pro') || (currentTier !== 'free' && plan.id === 'free');
+              const PlanIcon = plan.icon;
+
+              return (
+                <div
+                  key={plan.id}
+                  data-testid={`billing-plan-${plan.id}`}
+                  className={`relative rounded-xl border p-5 transition-all duration-200 ${
+                    isCurrentPlan
+                      ? 'border-emerald-500/40 bg-emerald-500/5 ring-1 ring-emerald-500/20'
+                      : 'border-[#1e293b] bg-surface-primary hover:border-slate-600'
+                  }`}
+                >
+                  {plan.popular && !isCurrentPlan && (
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                      <span className="bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+
+                  {isCurrentPlan && (
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                      <span className="bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                        Current Plan
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 mb-3 mt-1">
+                    <PlanIcon className={`h-5 w-5 ${isCurrentPlan ? 'text-emerald-400' : 'text-slate-400'}`} />
+                    <span className="font-semibold text-slate-100">{plan.name}</span>
+                  </div>
+
+                  <div className="mb-4">
+                    <span className="text-3xl font-bold text-slate-100">{plan.price}</span>
+                    <span className="text-sm text-slate-500">{plan.period}</span>
+                  </div>
+
+                  <ul className="space-y-2 mb-5">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-sm">
+                        <Check className={`h-4 w-4 mt-0.5 flex-shrink-0 ${isCurrentPlan ? 'text-emerald-400' : 'text-slate-500'}`} />
+                        <span className="text-slate-400">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {isCurrentPlan ? (
+                    <button
+                      disabled
+                      className="w-full py-2.5 rounded-lg text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default"
+                    >
+                      ✓ Current Plan
+                    </button>
+                  ) : plan.priceId && !isDowngrade ? (
+                    <button
+                      onClick={() => handleUpgrade(plan.priceId!, plan.name)}
+                      disabled={billingLoading === plan.priceId}
+                      data-testid={`upgrade-${plan.id}-btn`}
+                      className="w-full py-2.5 rounded-lg text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {billingLoading === plan.priceId ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <RefreshCw className="h-4 w-4 animate-spin" /> Processing...
+                        </span>
+                      ) : (
+                        `Upgrade to ${plan.name}`
+                      )}
+                    </button>
+                  ) : isDowngrade ? (
+                    <button
+                      onClick={handleManageBilling}
+                      disabled={billingLoading === 'portal'}
+                      className="w-full py-2.5 rounded-lg text-sm font-medium border border-[#334155] text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors disabled:opacity-50"
+                    >
+                      Manage Plan
+                    </button>
+                  ) : (
+                    <div className="h-[42px]" /> /* spacer for free plan when on free */
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
