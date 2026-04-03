@@ -71,6 +71,16 @@ class User(Base):
     company_name = Column(String, nullable=True)
     stripe_connect_id = Column(String, nullable=True)
     subscription_tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.FREE)
+    stripe_customer_id = Column(String, nullable=True)
+
+    # Email verification
+    email_verified = Column(Boolean, default=False)
+    email_verification_token = Column(String, nullable=True)
+
+    # Password reset
+    reset_password_token = Column(String, nullable=True)
+    reset_password_expires = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     connected_accounts = relationship("ConnectedAccount", back_populates="user")
