@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import {
-  LayoutDashboard, CreditCard, Mail, BarChart3, Settings, Link2,
+  LayoutDashboard, CreditCard, Mail, BarChart3, Settings,
   LogOut, ChevronLeft, ChevronRight, Menu, X, Zap, Crown, Shield
 } from 'lucide-react';
 
@@ -101,24 +101,21 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <p className="px-3 text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-2">Settings</p>
           )}
           {settingsNav.map(item => (
-            <NavItem key={item.path} {...item} />
+            <NavItem
+              key={item.path}
+              {...item}
+              badge={
+                !collapsed ? (
+                  <div
+                    data-testid="stripe-status-dot"
+                    className={`w-2 h-2 rounded-full ml-auto flex-shrink-0 ${
+                      stripeConnected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]'
+                    }`}
+                  />
+                ) : undefined
+              }
+            />
           ))}
-          <div
-            className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-400"
-          >
-            <Link2 className="h-5 w-5 flex-shrink-0" />
-            {!collapsed && (
-              <>
-                <span className="truncate">Stripe</span>
-                <div
-                  data-testid="stripe-status-dot"
-                  className={`w-2 h-2 rounded-full ml-auto flex-shrink-0 ${
-                    stripeConnected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]'
-                  }`}
-                />
-              </>
-            )}
-          </div>
         </div>
 
         <div className="pt-4">
@@ -131,9 +128,15 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <span className="text-xs font-semibold">{currentTier.label} Plan</span>
               {tier === 'free' && (
                 <Link
-                  to="/settings"
+                  to="/settings#billing"
                   data-testid="upgrade-cta"
                   className="ml-auto text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                  onClick={() => {
+                    // If already on settings page, scroll to billing
+                    setTimeout(() => {
+                      document.getElementById('billing')?.scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                  }}
                 >
                   Upgrade
                 </Link>
