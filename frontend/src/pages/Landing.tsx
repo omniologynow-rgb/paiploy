@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CreditCard, TrendingUp, Mail, BarChart3, Check, X as XIcon, ArrowRight,
-  Zap, Shield, Clock, Bell, Calculator, ChevronRight
+  Zap, Shield, Clock, Bell, Calculator, ChevronRight, Link2, Settings, ChevronDown, HelpCircle, MessageCircle,
+  Instagram, ExternalLink, User, Heart, Rocket
 } from 'lucide-react';
 
 const DashboardMockup = () => (
@@ -144,9 +145,10 @@ const RevenueCalculator = () => {
 const comparisonData = [
   { feature: 'Smart Retries', paiploy: true, churnBuster: true, churnKey: true, diy: false },
   { feature: 'Dunning Emails', paiploy: true, churnBuster: true, churnKey: true, diy: false },
-  { feature: 'AI Retry Timing', paiploy: true, churnBuster: false, churnKey: true, diy: false },
+  { feature: 'AI Retry Timing', paiploy: 'soon' as const, churnBuster: false, churnKey: true, diy: false },
   { feature: 'Pre-Dunning', paiploy: true, churnBuster: true, churnKey: true, diy: false },
-  { feature: 'SMS Recovery', paiploy: true, churnBuster: true, churnKey: true, diy: false },
+  { feature: 'SMS Recovery', paiploy: 'soon' as const, churnBuster: true, churnKey: true, diy: false },
+  { feature: 'Cancel Deflection', paiploy: false, churnBuster: false, churnKey: true, diy: false },
   { feature: 'Custom Templates', paiploy: true, churnBuster: true, churnKey: true, diy: false },
   { feature: 'Free Tier', paiploy: true, churnBuster: false, churnKey: false, diy: true },
 ];
@@ -172,6 +174,26 @@ const plans = [
     features: ['Everything in Pro', 'In-app payment wall', 'Multi-account management', 'API access', 'Priority support'],
   },
 ];
+
+const FaqItem: React.FC<{ question: string; answer: string }> = ({ question, answer }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-start justify-between gap-4 p-5 text-left hover:bg-surface-tertiary/30 transition-colors"
+      >
+        <span className="text-sm font-medium text-slate-200">{question}</span>
+        <ChevronDown className={`h-5 w-5 text-slate-400 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-5 pb-5 -mt-1">
+          <p className="text-sm text-slate-400 leading-relaxed">{answer}</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Landing: React.FC = () => {
   return (
@@ -235,10 +257,19 @@ export const Landing: React.FC = () => {
       {/* Social Proof */}
       <section className="py-12 border-y border-[#1e293b]" data-testid="social-proof-section">
         <div className="max-w-7xl mx-auto px-4">
-          <p className="text-center text-sm text-slate-500 mb-8">Trusted by 500+ subscription businesses</p>
-          <div className="flex flex-wrap justify-center gap-8">
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="w-24 h-8 rounded-lg bg-slate-800/50 border border-[#1e293b]" />
+          <p className="text-center text-sm text-slate-500 mb-8">Built for subscription businesses of every size</p>
+          <div className="flex flex-wrap justify-center gap-6 sm:gap-10">
+            {[
+              { num: '67%', label: 'avg recovery rate' },
+              { num: '<5min', label: 'setup time' },
+              { num: '$0', label: 'to get started' },
+              { num: '13', label: 'webhook events tracked' },
+              { num: '24/7', label: 'automated retries' },
+            ].map(item => (
+              <div key={item.label} className="text-center">
+                <p className="text-lg font-bold text-emerald-400">{item.num}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">{item.label}</p>
+              </div>
             ))}
           </div>
         </div>
@@ -311,8 +342,56 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
+      {/* How It Works */}
+      <section id="how-it-works" className="py-24 px-4" data-testid="how-it-works-section">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">How It Works</h2>
+            <p className="text-slate-400 max-w-2xl mx-auto">Get set up in under 5 minutes. No code, no complex integrations.</p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-8">
+            {[
+              {
+                step: '1',
+                icon: Link2,
+                title: 'Connect Stripe',
+                description: 'Authorize Paiploy with one click via Stripe OAuth. We get read-only access to your payment data — your credentials stay with Stripe.',
+              },
+              {
+                step: '2',
+                icon: Settings,
+                title: 'Configure Recovery',
+                description: 'Set your retry schedule, customize dunning email templates, and choose notification preferences. Smart defaults are already loaded.',
+              },
+              {
+                step: '3',
+                icon: TrendingUp,
+                title: 'Recover Revenue',
+                description: 'Paiploy monitors your payments 24/7. Failed charges are automatically retried with optimal timing and escalating dunning emails.',
+              },
+            ].map((item) => (
+              <div key={item.step} className="relative text-center group">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-5 group-hover:bg-emerald-500/15 transition-colors">
+                  <item.icon className="h-7 w-7 text-emerald-400" />
+                </div>
+                <div className="absolute -top-2 -right-2 sm:right-auto sm:left-[calc(50%+20px)] w-7 h-7 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center">
+                  {item.step}
+                </div>
+                <h3 className="text-lg font-semibold text-slate-100 mb-2">{item.title}</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">{item.description}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-12 text-center">
+            <Link to="/register" className="btn-primary px-6 py-3 inline-flex items-center gap-2">
+              Get Started Free <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Comparison Table */}
-      <section className="py-24 px-4" data-testid="comparison-section">
+      <section className="py-24 px-4 bg-surface-secondary" data-testid="comparison-section">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">See How Paiploy Compares</h2>
@@ -330,23 +409,24 @@ export const Landing: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {comparisonData.map((row) => (
-                  <tr key={row.feature} className="border-b border-[#1e293b]/50 hover:bg-surface-secondary/50">
-                    <td className="py-3.5 px-4 text-sm text-slate-300">{row.feature}</td>
-                    <td className="py-3.5 px-4 text-center bg-emerald-500/5 border-x border-emerald-500/10">
-                      {row.paiploy ? <Check className="h-5 w-5 text-emerald-400 mx-auto" /> : <XIcon className="h-5 w-5 text-red-400 mx-auto" />}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      {row.churnBuster ? <Check className="h-5 w-5 text-slate-500 mx-auto" /> : <XIcon className="h-5 w-5 text-red-400 mx-auto" />}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      {row.churnKey ? <Check className="h-5 w-5 text-slate-500 mx-auto" /> : <XIcon className="h-5 w-5 text-red-400 mx-auto" />}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      {row.diy ? <Check className="h-5 w-5 text-slate-500 mx-auto" /> : <XIcon className="h-5 w-5 text-red-400 mx-auto" />}
-                    </td>
-                  </tr>
-                ))}
+                {comparisonData.map((row) => {
+                  const renderCell = (val: boolean | 'soon', highlight?: boolean) => {
+                    if (val === 'soon') return <span className="text-xs font-medium text-amber-400">Soon</span>;
+                    if (val) return <Check className={`h-5 w-5 mx-auto ${highlight ? 'text-emerald-400' : 'text-slate-500'}`} />;
+                    return <XIcon className="h-5 w-5 text-red-400/60 mx-auto" />;
+                  };
+                  return (
+                    <tr key={row.feature} className="border-b border-[#1e293b]/50 hover:bg-surface-secondary/50">
+                      <td className="py-3.5 px-4 text-sm text-slate-300">{row.feature}</td>
+                      <td className="py-3.5 px-4 text-center bg-emerald-500/5 border-x border-emerald-500/10">
+                        {renderCell(row.paiploy, true)}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">{renderCell(row.churnBuster)}</td>
+                      <td className="py-3.5 px-4 text-center">{renderCell(row.churnKey)}</td>
+                      <td className="py-3.5 px-4 text-center">{renderCell(row.diy)}</td>
+                    </tr>
+                  );
+                })}
                 <tr className="border-b border-[#1e293b]/50">
                   <td className="py-3.5 px-4 text-sm font-semibold text-slate-200">Price</td>
                   <td className="py-3.5 px-4 text-center bg-emerald-500/5 border-x border-emerald-500/10">
@@ -428,6 +508,134 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section id="faq" className="py-24 px-4 bg-surface-secondary" data-testid="faq-section">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-5">
+              <HelpCircle className="h-7 w-7 text-emerald-400" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
+            <p className="text-slate-400">Everything you need to know about Paiploy.</p>
+          </div>
+          <div className="space-y-4">
+            {[
+              {
+                q: 'How does Paiploy recover failed payments?',
+                a: 'Paiploy monitors your Stripe account via webhooks. When a payment fails, we analyze the decline code and schedule smart retries at optimal times. We also send escalating dunning emails to encourage customers to update their payment method.',
+              },
+              {
+                q: 'Is my Stripe data safe?',
+                a: 'Absolutely. We connect via Stripe\'s official OAuth flow and only request the permissions we need. Your API keys and sensitive customer data never touch our servers. All webhook payloads are verified with Stripe signature validation.',
+              },
+              {
+                q: 'How long does setup take?',
+                a: 'Under 5 minutes. Connect your Stripe account, configure your retry schedule and dunning preferences, and you\'re live. Smart defaults are pre-loaded so you can start recovering revenue immediately.',
+              },
+              {
+                q: 'What if I\'m already using Stripe\'s built-in retries?',
+                a: 'Stripe\'s built-in retries are basic — fixed timing, no dunning emails, limited visibility. Paiploy adds intelligent retry scheduling based on decline codes, customizable email sequences, and detailed analytics. Specialized tools recover 67% more revenue on average.',
+              },
+              {
+                q: 'Can I use Paiploy for free?',
+                a: 'Yes! Our Free plan includes up to 50 recoveries per month with smart retries and basic analytics. No credit card required. Upgrade to Pro ($39/mo) or Business ($99/mo) when you need unlimited recoveries and advanced features.',
+              },
+              {
+                q: 'Do you support payment processors other than Stripe?',
+                a: 'Currently, Paiploy is built specifically for Stripe. We\'re exploring support for additional processors like Braintree and Recurly. Join our mailing list to be notified when new integrations launch.',
+              },
+              {
+                q: 'How do I cancel my subscription?',
+                a: 'You can cancel anytime from Settings → Subscription & Billing → Manage Billing. No contracts, no cancellation fees. You\'ll keep access to your current plan until the end of your billing period.',
+              },
+            ].map((faq, i) => (
+              <FaqItem key={i} question={faq.q} answer={faq.a} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Meet the Founder */}
+      <section id="about" className="py-24 px-4" data-testid="founder-section">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Built by a Founder Who Gets It</h2>
+            <p className="text-slate-400 max-w-2xl mx-auto">No VC funding. No dev team. Just relentless focus on solving a real problem for subscription businesses.</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div className="card p-8 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="flex items-center gap-4 mb-6">
+                <img src="/matt-ball.png" alt="Matt Ball, Founder of Paiploy" className="w-14 h-14 rounded-full object-cover object-top border-2 border-emerald-500/40" />
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100">Matt Ball</h3>
+                  <p className="text-sm text-slate-400">Founder &amp; Builder</p>
+                </div>
+              </div>
+              <p className="text-slate-300 leading-relaxed mb-4">
+                Two years ago I decided to transform completely. I started with a desk built to the Golden Ratio and began building tools on top of it.
+              </p>
+              <p className="text-slate-300 leading-relaxed mb-6">
+                9 months later I've launched two SaaS products designed to solve real problems. Just me, a suite of AI tools, and the belief that I can. Paiploy exists because failed payments shouldn't be one more thing founders lose sleep over.
+              </p>
+              <div className="flex items-center gap-4">
+                <a href="https://instagram.com/mattyball" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors">
+                  <Instagram className="h-4 w-4" /> @mattyball
+                </a>
+                <a href="https://instagram.com/paiployrecovery" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors">
+                  <Instagram className="h-4 w-4" /> @paiployrecovery
+                </a>
+              </div>
+            </div>
+            <div className="space-y-5">
+              {[
+                { icon: <Rocket className="h-5 w-5 text-emerald-400" />, title: 'Bootstrapped & Profitable', desc: 'No investors to please. Every decision optimizes for you, the user — not for growth metrics.' },
+                { icon: <Shield className="h-5 w-5 text-emerald-400" />, title: '100% Transparent', desc: 'Open pricing, honest comparison table, and "Coming Soon" badges on features we haven\'t shipped yet.' },
+                { icon: <Heart className="h-5 w-5 text-emerald-400" />, title: 'Built With Empathy', desc: 'As a solo founder, I know every dollar matters. That\'s why Paiploy starts at $0 — you upgrade when you\'re ready.' },
+                { icon: <Zap className="h-5 w-5 text-emerald-400" />, title: 'AI-Powered Development', desc: 'Leveraging cutting-edge AI to ship faster, iterate quicker, and keep prices lower than legacy competitors.' },
+              ].map((item, i) => (
+                <div key={i} className="flex gap-4 items-start">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0 mt-0.5">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-100 mb-1">{item.title}</h4>
+                    <p className="text-sm text-slate-400 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof / Early Access */}
+      <section className="py-16 px-4 bg-surface-secondary border-y border-[#1e293b]" data-testid="early-access-section">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-xs font-semibold tracking-widest text-emerald-400 uppercase mb-4">Early Access</p>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4">Be One of the First to Recover Revenue Automatically</h2>
+          <p className="text-slate-400 mb-8 max-w-2xl mx-auto">
+            Paiploy is new, which means you get founder-level support, direct input on the roadmap, and pricing that won't last forever.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-6 mb-8">
+            {[
+              { value: '$0', label: 'To get started', sub: 'No credit card required' },
+              { value: '< 5 min', label: 'Setup time', sub: 'Connect Stripe & go live' },
+              { value: '67%', label: 'More recovered', sub: 'vs basic Stripe retries' },
+            ].map((stat, i) => (
+              <div key={i} className="card p-5">
+                <p className="text-2xl font-extrabold text-emerald-400 mb-1">{stat.value}</p>
+                <p className="text-sm font-medium text-slate-200">{stat.label}</p>
+                <p className="text-xs text-slate-500 mt-1">{stat.sub}</p>
+              </div>
+            ))}
+          </div>
+          <Link to="/register" className="btn-primary px-7 py-3 text-base inline-flex items-center gap-2">
+            Claim Your Free Account <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="py-24 px-4" data-testid="final-cta-section">
         <div className="max-w-3xl mx-auto text-center">
@@ -463,20 +671,29 @@ export const Landing: React.FC = () => {
             <div>
               <h4 className="text-xs font-semibold tracking-widest text-slate-400 uppercase mb-4">Resources</h4>
               <ul className="space-y-2">
-                <li><a href="#" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Docs</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Support</a></li>
+                <li><Link to="/docs" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Docs</Link></li>
+                <li><a href="#about" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">About</a></li>
+                <li><a href="mailto:support@paiploy.com" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Support</a></li>
               </ul>
             </div>
             <div>
               <h4 className="text-xs font-semibold tracking-widest text-slate-400 uppercase mb-4">Legal</h4>
               <ul className="space-y-2">
-                <li><a href="#" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Privacy</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Terms</a></li>
+                <li><Link to="/privacy" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Privacy</Link></li>
+                <li><Link to="/terms" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">Terms</Link></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-[#1e293b] pt-6 text-center">
+          <div className="border-t border-[#1e293b] pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-sm text-slate-500" data-testid="footer-copyright">&copy; 2026 Paiploy. All rights reserved.</p>
+            <div className="flex items-center gap-5">
+              <a href="https://instagram.com/paiployrecovery" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-emerald-400 transition-colors" aria-label="Paiploy on Instagram">
+                <Instagram className="h-5 w-5" />
+              </a>
+              <a href="https://instagram.com/mattyball" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-emerald-400 transition-colors" aria-label="Founder on Instagram">
+                <User className="h-5 w-5" />
+              </a>
+            </div>
           </div>
         </div>
       </footer>
