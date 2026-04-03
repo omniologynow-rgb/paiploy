@@ -19,36 +19,23 @@ const formatCurrency = (cents: number) =>
 
 const COLORS = ['#10b981', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1'];
 
-const EmptyDashboard = () => (
-  <div className="card p-10 text-center" data-testid="dashboard-empty-state">
-    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-5">
-      <CheckCircle className="h-8 w-8 text-emerald-400" />
-    </div>
-    <h3 className="text-xl font-semibold text-slate-100 mb-2">No failed payments detected yet</h3>
-    <p className="text-slate-400 max-w-md mx-auto leading-relaxed">
-      This is a good thing! We're monitoring your Stripe account and will alert you the moment a payment fails.
-    </p>
-  </div>
-);
-
-const activityMock = [
-  { type: 'recovered', text: 'Payment of $49.99 recovered from john@example.com', time: '2 min ago', color: 'bg-emerald-400' },
-  { type: 'retry', text: 'Retry #2 attempted for $99.00 charge', time: '15 min ago', color: 'bg-amber-400' },
-  { type: 'email', text: 'Dunning email sent to sarah@startup.io', time: '1 hour ago', color: 'bg-blue-400' },
-  { type: 'failed', text: 'Payment of $29.00 failed - insufficient funds', time: '2 hours ago', color: 'bg-red-400' },
-  { type: 'recovered', text: 'Payment of $199.00 recovered from mike@corp.com', time: '3 hours ago', color: 'bg-emerald-400' },
-];
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activity, setActivity] = useState<Array<{type: string; text: string; time: string; color: string}>>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
 
   useEffect(() => {
     apiClient.getDashboardStats()
       .then(setStats)
       .catch(console.error)
       .finally(() => setLoading(false));
+    apiClient.getRecentActivity(8)
+      .then(setActivity)
+      .catch(console.error)
+      .finally(() => setActivityLoading(false));
   }, []);
 
   if (loading) {
@@ -72,72 +59,81 @@ export const Dashboard: React.FC = () => {
           <p className="text-slate-400">Overview of your payment recovery performance</p>
         </div>
 
-        {/* Quick Stats Bar */}
-        {hasData && (
-          <div className="card px-6 py-3 flex flex-wrap items-center gap-6 text-sm" data-testid="quick-stats-bar">
-            <span className="text-slate-400">This Month:</span>
-            <span className="text-emerald-400 font-semibold">{formatCurrency(stats!.revenue_recovered)} recovered</span>
-            <span className="text-slate-600">|</span>
-            <span className="text-amber-400 font-semibold">{stats!.active_retries} active</span>
-            <span className="text-slate-600">|</span>
-            <span className="text-slate-300 font-semibold">{stats!.recovery_rate.toFixed(1)}% rate</span>
+        {/* Quick Stats Bar — always show */}
+        <div className="card px-6 py-3 flex flex-wrap items-center gap-6 text-sm" data-testid="quick-stats-bar">
+          <span className="text-slate-400">This Month:</span>
+          <span className="text-emerald-400 font-semibold">{formatCurrency(stats?.revenue_recovered ?? 0)} recovered</span>
+          <span className="text-slate-600">|</span>
+          <span className="text-amber-400 font-semibold">{stats?.active_retries ?? 0} active</span>
+          <span className="text-slate-600">|</span>
+          <span className="text-slate-300 font-semibold">{(stats?.recovery_rate ?? 0).toFixed(1)}% rate</span>
+        </div>
+
+        {/* Stat Cards — always visible, show $0.00 when no data */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="card p-5 relative overflow-hidden group hover:scale-[1.02]" data-testid="stat-revenue-at-risk">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-sm">Revenue at Risk</span>
+                <AlertCircle className="h-5 w-5 text-amber-400" />
+              </div>
+              <div className="text-2xl font-bold text-amber-400">{formatCurrency(stats?.revenue_at_risk ?? 0)}</div>
+              <p className="text-xs text-slate-500 mt-1">Currently in retry</p>
+            </div>
+          </div>
+
+          <div className="card p-5 relative overflow-hidden group hover:scale-[1.02]" data-testid="stat-revenue-recovered">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-sm">Revenue Recovered</span>
+                <DollarSign className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div className="text-2xl font-bold text-emerald-400">{formatCurrency(stats?.revenue_recovered ?? 0)}</div>
+              <p className="text-xs text-slate-500 mt-1">Last 30 days</p>
+            </div>
+          </div>
+
+          <div className="card p-5 relative overflow-hidden group hover:scale-[1.02]" data-testid="stat-recovery-rate">
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-sm">Recovery Rate</span>
+                <TrendingUp className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div className="text-2xl font-bold text-slate-100">{(stats?.recovery_rate ?? 0).toFixed(1)}%</div>
+              <p className="text-xs text-slate-500 mt-1">Success rate</p>
+            </div>
+          </div>
+
+          <div className="card p-5 relative overflow-hidden group hover:scale-[1.02]" data-testid="stat-active-retries">
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-sm">Active Retries</span>
+                <RefreshCw className="h-5 w-5 text-teal-400" />
+              </div>
+              <div className="text-2xl font-bold text-slate-100">{stats?.active_retries ?? 0}</div>
+              <p className="text-xs text-slate-500 mt-1">In progress</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Empty state message when no data — show BELOW the stat cards */}
+        {!hasData && (
+          <div className="card p-10 text-center" data-testid="dashboard-empty-state">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-5">
+              <CheckCircle className="h-8 w-8 text-emerald-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-100 mb-2">No failed payments detected yet</h3>
+            <p className="text-slate-400 max-w-md mx-auto leading-relaxed">
+              This is a good thing! We're monitoring your Stripe account and will alert you the moment a payment fails.
+            </p>
           </div>
         )}
 
-        {!hasData ? (
-          <EmptyDashboard />
-        ) : (
+        {/* Charts — only when there's data */}
+        {hasData && (
           <>
-            {/* Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="card p-5 relative overflow-hidden group hover:scale-[1.02]" data-testid="stat-revenue-at-risk">
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent" />
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-400 text-sm">Revenue at Risk</span>
-                    <AlertCircle className="h-5 w-5 text-amber-400" />
-                  </div>
-                  <div className="text-2xl font-bold text-amber-400">{formatCurrency(stats!.revenue_at_risk)}</div>
-                  <p className="text-xs text-slate-500 mt-1">Currently in retry</p>
-                </div>
-              </div>
-
-              <div className="card p-5 relative overflow-hidden group hover:scale-[1.02]" data-testid="stat-revenue-recovered">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent" />
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-400 text-sm">Revenue Recovered</span>
-                    <DollarSign className="h-5 w-5 text-emerald-400" />
-                  </div>
-                  <div className="text-2xl font-bold text-emerald-400">{formatCurrency(stats!.revenue_recovered)}</div>
-                  <p className="text-xs text-slate-500 mt-1">Last 30 days</p>
-                </div>
-              </div>
-
-              <div className="card p-5 relative overflow-hidden group hover:scale-[1.02]" data-testid="stat-recovery-rate">
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-400 text-sm">Recovery Rate</span>
-                    <TrendingUp className="h-5 w-5 text-emerald-400" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-100">{stats!.recovery_rate.toFixed(1)}%</div>
-                  <p className="text-xs text-slate-500 mt-1">Success rate</p>
-                </div>
-              </div>
-
-              <div className="card p-5 relative overflow-hidden group hover:scale-[1.02]" data-testid="stat-active-retries">
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-400 text-sm">Active Retries</span>
-                    <RefreshCw className="h-5 w-5 text-teal-400" />
-                  </div>
-                  <div className="text-2xl font-bold text-slate-100">{stats!.active_retries}</div>
-                  <p className="text-xs text-slate-500 mt-1">In progress</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="card p-6" data-testid="recovery-timeline-chart">
                 <h2 className="text-lg font-semibold text-slate-100 mb-4">Recovery Timeline</h2>
@@ -188,7 +184,7 @@ export const Dashboard: React.FC = () => {
             <div className="card p-6" data-testid="recent-activity-feed">
               <h2 className="text-lg font-semibold text-slate-100 mb-4">Recent Activity</h2>
               <div className="space-y-3">
-                {activityMock.map((a, i) => (
+                {(activity.length > 0 ? activity : [{type: "info", text: "No activity yet — connect your Stripe account to start recovering payments", time: "now", color: "bg-slate-400"}]).map((a, i) => (
                   <div key={i} className="flex items-start gap-3 py-2">
                     <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${a.color}`} />
                     <div className="flex-1 min-w-0">
