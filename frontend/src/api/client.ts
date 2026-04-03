@@ -170,14 +170,14 @@ export class ApiClient {
   }
 
   async createCheckout(priceId: string) {
-    return this.request('/api/billing/checkout', {
+    return this.request('/api/billing/create-checkout-session', {
       method: 'POST',
       body: JSON.stringify({ price_id: priceId }),
     });
   }
 
   async getBillingPortal() {
-    return this.request('/api/billing/portal', { method: 'POST' });
+    return this.request('/api/billing/create-portal-session', { method: 'POST' });
   }
 
   // ─── Auth: Forgot / Reset Password ─────────────────────────
@@ -200,6 +200,10 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify({ token }),
     });
+  }
+
+  async getRecentActivity(limit: number = 10) {
+    return this.request(`/api/recovery/activity?limit=${limit}`);
   }
 }
 
