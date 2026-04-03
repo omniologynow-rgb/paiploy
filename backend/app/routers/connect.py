@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import stripe
+import logging
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, ConnectedAccount
@@ -6,7 +9,10 @@ from app.schemas import ConnectedAccountResponse
 from app.auth import get_current_user
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 router = APIRouter(prefix="/api/connect", tags=["stripe-connect"])
 
@@ -35,21 +41,50 @@ async def stripe_connect_callback(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Exchange authorization code for access token via Stripe OAuth
+    try:
+        response = stripe.OAuth.token(
+            grant_type="authorization_code",
+            code=code,
+        )
+    except stripe.error.OAuthError as e:
+        logger.error(f"Stripe OAuth error for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to connect Stripe account: {str(e)}"
+        )
+
+    stripe_account_id = response.get("stripe_user_id")
+    access_token = response.get("access_token")
+    refresh_token = response.get("refresh_token")
+
+    if not stripe_account_id:
+        raise HTTPException(status_code=400, detail="No Stripe account ID returned")
+
+    # Deactivate any existing connection for this user
+    existing = db.query(ConnectedAccount).filter(
+        ConnectedAccount.user_id == user_id,
+        ConnectedAccount.is_active == True
+    ).all()
+    for acct in existing:
+        acct.is_active = False
+
+    # Create the new connected account record
     connected_account = ConnectedAccount(
         user_id=user_id,
-        stripe_account_id=f"acct_mock_{user_id}",
-        access_token=f"mock_access_token_{code}",
-        refresh_token=f"mock_refresh_token_{code}",
+        stripe_account_id=stripe_account_id,
+        access_token=access_token,
+        refresh_token=refresh_token,
         is_active=True
     )
 
     db.add(connected_account)
     db.commit()
 
-    return {
-        "message": "Stripe account connected successfully",
-        "redirect_url": f"{settings.FRONTEND_URL}/dashboard"
-    }
+    logger.info(f"Stripe account {stripe_account_id} connected for user {user_id}")
+
+    # Redirect back to the frontend dashboard
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard?connected=true")
 
 
 @router.delete("/disconnect")
@@ -64,6 +99,15 @@ async def disconnect_stripe(
 
     if not account:
         raise HTTPException(status_code=404, detail="No active connection found")
+
+    # Revoke access on Stripe's side
+    try:
+        stripe.OAuth.deauthorize(
+            client_id=settings.STRIPE_CONNECT_CLIENT_ID,
+            stripe_user_id=account.stripe_account_id,
+        )
+    except stripe.error.StripeError as e:
+        logger.warning(f"Failed to deauthorize on Stripe: {e}")
 
     account.is_active = False
     db.commit()
